@@ -1,6 +1,10 @@
 var express = require('express')
 var multer = require('multer')
 var bodyParser = require('body-parser')
+var fs = require('fs')
+var unzip = require('unzip')
+var path = require('path')
+var mkdir = require('mkdirp')
 var app = express()
 
 
@@ -14,11 +18,12 @@ app.use(function(req, res, next) { //allow cross origin requests
     next();
 });
 
+//load file upload form
 app.get('/', function(req, res) {
     res.sendFile(__dirname + '/index.html')
 });
 
-
+//set folder for file upload
 var storage = multer.diskStorage({ //multers disk storage settings
     destination: function (req, file, cb) {
         cb(null, './uploads/');
@@ -30,6 +35,7 @@ var storage = multer.diskStorage({ //multers disk storage settings
     }
 });
 
+//call multer
 var upload = multer({ //multer settings
                 storage: storage
             }).single('file');
@@ -46,9 +52,26 @@ app.post('/upload', function(req, res) {
     });
 });
 
+//unzip
+  fs.createReadStream('uploads/archives.zip')
+  .pipe(unzip.Parse())
+  .on('entry', function (entry) {
 
+    var fileName = entry.path
+    var type = entry.type
 
+    if (type==='File' && fileName === 'dir/fileInsideDir.txt') {
 
+      var fullPath = __dirname + '/output/' + path.dirname( fileName )
+      fileName = path.basename( fileName )
+      mkdir.sync(fullPath)
+      entry.pipe(fs.createWriteStream( fullPath + '/' + fileName ))
+
+    } else {
+      entry.autodrain()
+    }
+
+  })
 
 
 app.listen(3000, function() {
