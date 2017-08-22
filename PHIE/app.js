@@ -6,13 +6,13 @@ var unzip = require('unzip')
 var path = require('path')
 var mkdir = require('mkdirp')
 var app = express()
+var fsname=''
 
 
 app.use(bodyParser.json());  
 
 app.use(function(req, res, next) { //allow cross origin requests
     res.setHeader("Access-Control-Allow-Methods", "POST, PUT, OPTIONS, DELETE, GET");
-    //res.header("Access-Control-Allow-Origin", "http://localhost:3000");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     res.header("Access-Control-Allow-Credentials", true);
     next();
@@ -22,6 +22,25 @@ app.use(function(req, res, next) { //allow cross origin requests
 app.get('/', function(req, res) {
     res.sendFile(__dirname + '/index.html')
 });
+
+//unzip
+function unzipFile(req,res){
+    fs.createReadStream('uploads/'+req.file.originalname)
+    .pipe(unzip.Parse())
+    .on('entry', function (entry) {
+      var fileName = entry.path
+      var type = entry.type
+      if (type==='File') {
+        var fullPath = __dirname + '/output/' + path.dirname( fileName )
+        fileName = path.basename( fileName )
+        mkdir.sync(fullPath)
+        entry.pipe(fs.createWriteStream( fullPath + '/' + fileName ))
+      } else {
+        entry.autodrain()
+      }
+    })
+}
+
 
 //set folder for file upload
 var storage = multer.diskStorage({ //multers disk storage settings
@@ -48,32 +67,14 @@ app.post('/upload', function(req, res) {
              res.json({error_code:1,err_desc:err});
              return;
         }
-        res.json({error_code:0,err_desc:null,filename:req.file.originalname});
-    });
-});
+        res.json({error_code:0,err_desc:null,filename:req.file.originalname})
 
-//unzip
-  fs.createReadStream('uploads/archives.zip')
-  .pipe(unzip.Parse())
-  .on('entry', function (entry) {
+        unzipFile(req,res)
+        
+    })
+})
 
-    var fileName = entry.path
-    var type = entry.type
-
-    if (type==='File' && fileName === 'dir/fileInsideDir.txt') {
-
-      var fullPath = __dirname + '/output/' + path.dirname( fileName )
-      fileName = path.basename( fileName )
-      mkdir.sync(fullPath)
-      entry.pipe(fs.createWriteStream( fullPath + '/' + fileName ))
-
-    } else {
-      entry.autodrain()
-    }
-
-  })
-
-
+  
 app.listen(3000, function() {
     console.log('App running on port 3000')
 });
